@@ -5,8 +5,28 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"strconv"
 )
-import "strconv"
+
+//爬取单个页面的函数
+func spiderPage(index int, page chan int) {
+	url := "https://tieba.baidu.com/f?kw=%E7%BB%9D%E5%9C%B0%E6%B1%82%E7%94%9F&ie=utf-8&pn=" + strconv.Itoa((index-1)*50)
+	result, err := httpGet(url)
+	if err != nil {
+		fmt.Println("httpGet err:", err)
+		return
+	}
+	//fmt.Println("result=", result)
+	//将读到的网页数据，保存成文件
+	f, err := os.Create("第 " + strconv.Itoa(index) + "页 " + ".html")
+	if err != nil {
+		fmt.Println("Create err:", err)
+		return
+	}
+	f.WriteString(result)
+	f.Close() //保存完一个文件，关闭一个文件
+	page <- index
+}
 
 func httpGet(url string) (result string, err error) {
 	resp, err1 := http.Get(url)
@@ -37,23 +57,13 @@ func httpGet(url string) (result string, err error) {
 //爬取页面操作
 func working(start, end int) {
 	fmt.Print("正在爬取第%d页到%d页......\n", start, end)
+	page := make(chan int)
 	//循环爬取每一页的数据
 	for i := start; i <= end; i++ {
-		url := "https://tieba.baidu.com/f?kw=%E7%BB%9D%E5%9C%B0%E6%B1%82%E7%94%9F&ie=utf-8&pn=" + strconv.Itoa((i-1)*50)
-		result, err := httpGet(url)
-		if err != nil {
-			fmt.Println("httpGet err:", err)
-			continue
-		}
-		fmt.Println("result=", result)
-		//将读到的网页数据，保存成文件
-		f, err := os.Create("第 " + strconv.Itoa(i) + "页 " + ".html")
-		if err != nil {
-			fmt.Println("Create err:", err)
-			continue
-		}
-		f.WriteString(result)
-		f.Close()  //保存完一个文件，关闭一个文件
+		go spiderPage(i, page)
+	}
+	for i := start; i <= end; i++ {
+		fmt.Print("爬取第%d页......\n", <-page)
 	}
 }
 
